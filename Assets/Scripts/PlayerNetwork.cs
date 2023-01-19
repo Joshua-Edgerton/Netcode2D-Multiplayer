@@ -10,8 +10,6 @@ public class PlayerNetwork : NetworkBehaviour
 
     private void Update()
     {  
-        if (!IsOwner) return;
-
         if (IsClient && IsLocalPlayer)
         { 
             float moveX = 0f;
