@@ -1,8 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 using Unity.Netcode;
 using System;
+using System.Linq;
 
 public class NetworkMovementComponent : NetworkBehaviour
 {
@@ -14,6 +16,7 @@ public class NetworkMovementComponent : NetworkBehaviour
     private int _tick = 0;
     private float _tickRate = 1f / 60f;
     private float _tickDeltaTime = 0f;
+    private int _lastProcessedTick = -0;
 
     //Store the sent input
     private const int BUFFER_SIZE = 1024;
@@ -23,7 +26,7 @@ public class NetworkMovementComponent : NetworkBehaviour
     private InputState[] _inputStates = new InputState[BUFFER_SIZE];
 
     // An array of transforms with the same buffer size
-    private TransformState[] _transformStates = new TransformState[BUFFER_SIZE];
+    public TransformState[] _transformStates = new TransformState[BUFFER_SIZE];
 
     // So the server can send this information -
     // This will be the latest transform that has been established on the server
@@ -36,11 +39,70 @@ public class NetworkMovementComponent : NetworkBehaviour
         ServerTransformState.OnValueChanged += OnServerStateChanged;
     }
 
-    //In the future, this is where server reconciliation will be established
-    private void OnServerStateChanged(TransformState previousValue, TransformState newValue)
+    public override void OnNetworkSpawn()
     {
-        // Set the previous transform state to be the previous value
-        _previousTransformState = previousValue;
+        base.OnNetworkSpawn();
+    }
+
+    //In the future, this is where server reconciliation will be established
+    private void OnServerStateChanged(TransformState previousValue, TransformState serverState)
+    {
+        if(!IsLocalPlayer) return;
+
+            if (_previousTransformState == null)
+            {
+                _previousTransformState = serverState;
+            }
+            TransformState calculatedState = _transformStates.First(localState => localState.Tick == serverState.Tick);
+            if (calculatedState.Position != serverState.Position)
+            {
+                Debug.Log("Correcting client position");
+                //Teleport the player to the server position
+                TeleportPlayer(serverState);
+                //Replay the inputs that happened after
+                IEnumerable<InputState> inputs = _inputStates.Where(input => input.Tick > serverState.Tick);
+                inputs = from input in inputs orderby input.Tick select input;
+                
+                foreach (InputState inputState in inputs)
+                {
+                    MovePlayer(_pn.moveDirectionPn);
+                    //RotatePlayer(inputState.LookInput);
+
+                    TransformState newTransformState = new TransformState()
+                    {
+                        Tick = inputState.Tick,
+                        Position = transform.position,
+                        //Rotation = transform.rotation,
+                        HasStartedMoving = true
+                    };
+
+                    for (int i = 0; i < _transformStates.Length; i++)
+                    {
+                        if (_transformStates[i].Tick == inputState.Tick)
+                        {
+                            _transformStates[i] = newTransformState;
+                            break;
+                        }
+                    }
+                }
+            }
+    }
+
+    private void TeleportPlayer(TransformState state)
+    {
+        _pn.enabled = false;
+        transform.position = state.Position;
+        //transform.rotation = state.Rotation;
+        _pn.enabled = true;
+
+        for (int i = 0; i < _transformStates.Length; i++)
+        {
+            if (_transformStates[i].Tick == state.Tick)
+            {
+                _transformStates[i] = state;
+                break;
+            }
+        }
     }
 
     // Enable the PlayerNetwork script controller to call a method for actually moving

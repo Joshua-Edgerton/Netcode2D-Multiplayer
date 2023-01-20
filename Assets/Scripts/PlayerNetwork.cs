@@ -7,6 +7,13 @@ using UnityEngine.InputSystem;
 public class PlayerNetwork : NetworkBehaviour
 {
     [SerializeField] private NetworkMovementComponent _playerMovement;
+    [SerializeField] private Transform aimTransform;
+    public Vector3 moveDirectionPn;
+
+    private void Awake()
+    {
+        aimTransform = transform.Find("AimedParent");
+    }
 
     private void Update()
     {  
@@ -21,6 +28,7 @@ public class PlayerNetwork : NetworkBehaviour
             if(Input.GetKey(KeyCode.D)) moveX = +1f;
 
             Vector3 moveDirection = new Vector3(moveX, moveY, 0f).normalized;
+            moveDirectionPn = moveDirection;
             _playerMovement.ProcessLocalPlayerMovement(moveDirection);
 
         } else {
