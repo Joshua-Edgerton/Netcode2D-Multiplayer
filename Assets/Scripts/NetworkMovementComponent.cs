@@ -123,6 +123,7 @@ public class NetworkMovementComponent : NetworkBehaviour
                 // New server RPC which takes the current tick and the input
                 MovePlayerServerRpc(_tick, movementInput);
                 MovePlayer(movementInput);
+                SaveState(movementInput, bufferIndex);
 
             } else 
             {
@@ -135,25 +136,11 @@ public class NetworkMovementComponent : NetworkBehaviour
                     HasStartedMoving = true
                 };
 
+                SaveState(movementInput, bufferIndex);
+
                 _previousTransformState = ServerTransformState.Value;
                 ServerTransformState.Value = state;
             }
-
-            InputState inputState = new InputState()
-            {
-                Tick = _tick,
-                movementInput = movementInput,
-            };
-
-            TransformState transformState = new TransformState()
-            {
-                Tick = _tick,
-                Position = transform.position,
-                HasStartedMoving = true
-            };
-
-            _inputStates[bufferIndex] = inputState;
-            _transformStates[bufferIndex] = transformState;
 
             _tickDeltaTime -= _tickRate;
             _tick++;
@@ -175,6 +162,25 @@ public class NetworkMovementComponent : NetworkBehaviour
             _tickDeltaTime -= _tickRate;
             _tick++;
         }
+    }
+
+    private void SaveState(Vector2 movementInput, int bufferIndex)
+    {
+            InputState inputState = new InputState()
+            {
+                Tick = _tick,
+                movementInput = movementInput,
+            };
+
+            TransformState transformState = new TransformState()
+            {
+                Tick = _tick,
+                Position = transform.position,
+                HasStartedMoving = true
+            };
+
+            _inputStates[bufferIndex] = inputState;
+            _transformStates[bufferIndex] = transformState;
     }
 
     private void MovePlayer(Vector3 movementInput)
